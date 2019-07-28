@@ -176,6 +176,6 @@ func extractTarball() {
 }
 
 func main() {
-	// createTarball()
-	extractTarball()
+	createTarball()
+	// extractTarball()
 }
