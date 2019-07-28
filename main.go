@@ -61,7 +61,6 @@ func createTarball() {
 	defer tarfileWriter.Close()
 
 	for _, fileInfo := range files {
-		fmt.Println(fileInfo)
 		if fileInfo.IsDir() {
 			continue
 		}
@@ -72,11 +71,9 @@ func createTarball() {
 
 		defer file.Close()
 
-		header := new(tar.Header)
-		header.Name = file.Name()
-		header.Size = fileInfo.Size()
-		header.Mode = int64(fileInfo.Mode())
-		header.ModTime = fileInfo.ModTime()
+		header, err := tar.FileInfoHeader(fileInfo, "")
+
+		checkError(err)
 
 		err = tarfileWriter.WriteHeader(header)
 
@@ -87,8 +84,6 @@ func createTarball() {
 		checkError(err)
 
 	}
-
-	fmt.Println(fileInfo)
 }
 
 func extractTarball() {
@@ -138,7 +133,7 @@ func extractTarball() {
 		}
 
 		// get the individual filename and extract to the current directory
-		filename := header.Name
+		filename := header.Name // add absolute path
 
 		switch header.Typeflag {
 		case tar.TypeDir:
@@ -179,6 +174,12 @@ func extractTarball() {
 }
 
 func main() {
-	createTarball()
-	// extractTarball()
+	// createTarball()
+	extractTarball()
 }
+
+// @TOTDO specify extraction directory: tarball.tar.gz needs to be extracted in tarball directory
+// now the tarball is being extracted in the directory the bin file is being ran from
+
+// @TODO add absolute path to the creating directories
+// @TODO add a server
