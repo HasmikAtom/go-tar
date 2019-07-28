@@ -61,6 +61,7 @@ func createTarball() {
 	defer tarfileWriter.Close()
 
 	for _, fileInfo := range files {
+		fmt.Println(fileInfo)
 		if fileInfo.IsDir() {
 			continue
 		}
@@ -86,6 +87,8 @@ func createTarball() {
 		checkError(err)
 
 	}
+
+	fmt.Println(fileInfo)
 }
 
 func extractTarball() {
