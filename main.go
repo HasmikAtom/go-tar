@@ -35,19 +35,23 @@ func createTarball() {
 		os.Exit(1)
 	}
 
-	dir, err := os.Open(sourcedir)
+	absSourcePath, err := filepath.Abs(sourcedir) // getting absolute path to the directory to tar
+	checkError(err)
 
+	absDestinationPath, err := filepath.Abs(destinationfile) // getting absolute path to the destination file
+	checkError(err)
+
+	dir, err := os.Open(absSourcePath)
 	checkError(err)
 
 	defer dir.Close()
 
 	files, err := dir.Readdir(0)
-
 	checkError(err)
 
-	tarfile, err := os.Create(destinationfile)
-
+	tarfile, err := os.Create(absDestinationPath)
 	checkError(err)
+
 	defer tarfile.Close()
 	var fileWriter io.WriteCloser = tarfile
 
@@ -66,21 +70,17 @@ func createTarball() {
 		}
 
 		file, err := os.Open(dir.Name() + string(filepath.Separator) + fileInfo.Name())
-
 		checkError(err)
 
 		defer file.Close()
 
 		header, err := tar.FileInfoHeader(fileInfo, "")
-
 		checkError(err)
 
 		err = tarfileWriter.WriteHeader(header)
-
 		checkError(err)
 
 		_, err = io.Copy(tarfileWriter, file)
-
 		checkError(err)
 
 	}
@@ -97,12 +97,11 @@ func extractTarball() {
 		os.Exit(1)
 	}
 
-	file, err := os.Open(sourcefile)
+	absSourcePath, err := filepath.Abs(sourcefile) // getting absolute path to the directory to tar
+	checkError(err)
 
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	file, err := os.Open(absSourcePath)
+	checkError(err)
 
 	defer file.Close()
 
@@ -111,7 +110,6 @@ func extractTarball() {
 	// just in case we are reading a tar.gz file, add a filter to handle gzipped file
 	if strings.HasSuffix(sourcefile, ".gz") {
 		if fileReader, err = gzip.NewReader(file); err != nil {
-
 			fmt.Println(err)
 			os.Exit(1)
 		}
@@ -121,7 +119,6 @@ func extractTarball() {
 	tarBallReader := tar.NewReader(fileReader)
 
 	// Extracting tarred files
-
 	for {
 		header, err := tarBallReader.Next()
 		if err != nil {
@@ -134,36 +131,27 @@ func extractTarball() {
 
 		// get the individual filename and extract to the current directory
 		filename := header.Name // add absolute path
-
+		fmt.Println(filename)
 		switch header.Typeflag {
 		case tar.TypeDir:
 			// handle directory
 			fmt.Println("Creating directory :", filename)
-			err = os.MkdirAll(filename, os.FileMode(header.Mode)) // or use 0755 if you prefer
 
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
+			err = os.MkdirAll(filename, os.FileMode(header.Mode)) // or use 0755 if you prefer
+			checkError(err)
 
 		case tar.TypeReg:
 			// handle normal file
 			fmt.Println("Untarring :", filename)
 			writer, err := os.Create(filename)
 
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
+			checkError(err)
 
 			io.Copy(writer, tarBallReader)
 
 			err = os.Chmod(filename, os.FileMode(header.Mode))
 
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
+			checkError(err)
 
 			writer.Close()
 		default:
@@ -178,8 +166,8 @@ func main() {
 	extractTarball()
 }
 
-// @TOTDO specify extraction directory: tarball.tar.gz needs to be extracted in tarball directory
+// @TODO specify extraction directory: tarball.tar.gz needs to be extracted in tarball directory
 // now the tarball is being extracted in the directory the bin file is being ran from
 
-// @TODO add absolute path to the creating directories
+// @TODO add absolute path to the creating directories :: DONE
 // @TODO add a server
