@@ -107,16 +107,52 @@ func extractTarball() {
 
 	var fileReader io.ReadCloser = file
 
+	// getting destination directory
+	destinationdir := flag.Arg(1)
+
+	var destEmpty bool
+	var absDestinationPath string
+	var extension string
+
+	// setting the destination directory, if the flag is empty it gets the tar filename, of not it sets it to the flag value
+	if destinationdir == "" {
+		destEmpty = true
+		var filename = file.Name()
+		extension = filepath.Ext(filename)
+		destinationdir := filename[0 : len(filename)-len(extension)]
+		absDestinationPath = destinationdir
+
+	} else {
+		destEmpty = false
+		destinationdir, err := filepath.Abs(destinationdir)
+		absDestinationPath = destinationdir
+		checkError(err)
+	}
+
 	// just in case we are reading a tar.gz file, add a filter to handle gzipped file
 	if strings.HasSuffix(sourcefile, ".gz") {
 		if fileReader, err = gzip.NewReader(file); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
+		// trimming the gz extension if destination flag is empty
+		if destEmpty {
+			extension = filepath.Ext(absDestinationPath)
+			absDestinationPath = absDestinationPath[0 : len(absDestinationPath)-len(extension)]
+		}
+
 		defer fileReader.Close()
 	}
 
+	fmt.Println(absDestinationPath) // printing the destination directory
+
+	//making the parent directory where the files will be untarred
+	err = os.MkdirAll(absDestinationPath, os.ModePerm)
+	checkError(err)
+
 	tarBallReader := tar.NewReader(fileReader)
+
+	parentDir, err := os.Open(absDestinationPath)
 
 	// Extracting tarred files
 	for {
@@ -137,7 +173,7 @@ func extractTarball() {
 			// handle directory
 			fmt.Println("Creating directory :", filename)
 
-			err = os.MkdirAll(filename, os.FileMode(header.Mode)) // or use 0755 if you prefer
+			err = os.MkdirAll(filename, os.FileMode(header.Mode)) // or use 0755
 			checkError(err)
 
 		case tar.TypeReg:
