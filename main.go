@@ -21,14 +21,14 @@ func checkError(err error) {
 func createTarball() {
 	// parsing the flags
 	flag.Parse()
-	sourcedir := flag.Arg(0)
+	sourcedir := flag.Arg(1)
 
 	if sourcedir == "" {
 		fmt.Println("Please specify the source\nUsage: go-tarball source destinationfile.tar.gz")
 		os.Exit(1)
 	}
 
-	destinationfile := flag.Arg(1)
+	destinationfile := flag.Arg(2)
 
 	if destinationfile == "" {
 		fmt.Println("Please specify the destination\nUsage: go-tarball source destinationfile.tar.gz")
@@ -90,7 +90,7 @@ func extractTarball() {
 
 	flag.Parse() // get the arguments from command line
 
-	sourcefile := flag.Arg(0)
+	sourcefile := flag.Arg(1)
 
 	if sourcefile == "" {
 		fmt.Println("Usage : go-untar sourcefile.tar")
@@ -108,7 +108,7 @@ func extractTarball() {
 	var fileReader io.ReadCloser = file
 
 	// getting destination directory
-	destinationdir := flag.Arg(1)
+	destinationdir := flag.Arg(2)
 
 	var destEmpty bool
 	var absDestinationPath string
@@ -144,8 +144,6 @@ func extractTarball() {
 		defer fileReader.Close()
 	}
 
-	fmt.Println(absDestinationPath) // printing the destination directory
-
 	//making the parent directory where the files will be untarred
 	err = os.MkdirAll(absDestinationPath, os.ModePerm)
 	checkError(err)
@@ -153,6 +151,7 @@ func extractTarball() {
 	tarBallReader := tar.NewReader(fileReader)
 
 	parentDir, err := os.Open(absDestinationPath)
+	defer parentDir.Close()
 
 	// Extracting tarred files
 	for {
@@ -166,8 +165,7 @@ func extractTarball() {
 		}
 
 		// get the individual filename and extract to the current directory
-		filename := header.Name // add absolute path
-		fmt.Println(filename)
+		filename := filepath.Join(absDestinationPath, header.Name) // add absolute path
 		switch header.Typeflag {
 		case tar.TypeDir:
 			// handle directory
@@ -198,12 +196,18 @@ func extractTarball() {
 }
 
 func main() {
-	// createTarball()
-	extractTarball()
+
+	flag.Parse()
+	if flag.Arg(0) == "tar" {
+		createTarball()
+	}
+	if flag.Arg(0) == "untar" {
+		extractTarball()
+	}
 }
 
-// @TODO specify extraction directory: tarball.tar.gz needs to be extracted in tarball directory
-// now the tarball is being extracted in the directory the bin file is being ran from
-
-// @TODO add absolute path to the creating directories :: DONE
 // @TODO add a server
+
+// @TODO specify extraction directory: tarball.tar.gz needs to be extracted in tarball directory :: DONE
+// now the tarball is being extracted in the directory the bin file is being ran from
+// @TODO add absolute path to the creating directories :: DONE
