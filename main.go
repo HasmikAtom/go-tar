@@ -6,7 +6,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -18,7 +20,7 @@ func checkError(err error) {
 	}
 }
 
-func createTarball() {
+func createTarball() error {
 	// parsing the flags
 	flag.Parse()
 	sourcedir := flag.Arg(1)
@@ -41,49 +43,61 @@ func createTarball() {
 	absDestinationPath, err := filepath.Abs(destinationfile) // getting absolute path to the destination file
 	checkError(err)
 
-	dir, err := os.Open(absSourcePath)
-	checkError(err)
+	// creating destination directory
+	destinationDir, err := os.Create(absDestinationPath) // created file
+	if err != nil {
+		return err
+	}
 
-	defer dir.Close()
+	var fileWriter io.WriteCloser = destinationDir
 
-	files, err := dir.Readdir(0)
-	checkError(err)
-
-	tarfile, err := os.Create(absDestinationPath)
-	checkError(err)
-
-	defer tarfile.Close()
-	var fileWriter io.WriteCloser = tarfile
-
+	// compressing if second flag contains "gz"
 	if strings.HasSuffix(destinationfile, ".gz") {
-		fileWriter = gzip.NewWriter(tarfile) // add gzip filter
+		fileWriter = gzip.NewWriter(destinationDir) // add gzip filter
 		defer fileWriter.Close()
 	}
 
-	tarfileWriter := tar.NewWriter(fileWriter)
-
-	defer tarfileWriter.Close()
-
-	for _, fileInfo := range files {
-		if fileInfo.IsDir() {
-			continue
+	tarWriter := tar.NewWriter(fileWriter)
+	// going over the files
+	err = filepath.Walk(absSourcePath, func(file string, fi os.FileInfo, err error) error {
+		// for each file
+		if err != nil {
+			return err
+		}
+		// excluding
+		if path.Ext(file) == ".tar" || path.Ext(file) == ".log" || strings.Contains(file, "node_module") || strings.Contains(file, ".git") {
+			return nil
 		}
 
-		file, err := os.Open(dir.Name() + string(filepath.Separator) + fileInfo.Name())
-		checkError(err)
+		header, err := tar.FileInfoHeader(fi, file)
+		if err != nil {
+			return err
+		}
+		header.Name = strings.TrimPrefix(file, absSourcePath)
+		if header.Name == "" {
+			return nil
+		}
+		if err := tarWriter.WriteHeader(header); err != nil {
+			return err
+		}
+		if !fi.IsDir() {
+			// read file if its a directory
+			data, err := ioutil.ReadFile(file)
+			if err != nil {
+				return err
+			}
 
-		defer file.Close()
-
-		header, err := tar.FileInfoHeader(fileInfo, "")
-		checkError(err)
-
-		err = tarfileWriter.WriteHeader(header)
-		checkError(err)
-
-		_, err = io.Copy(tarfileWriter, file)
-		checkError(err)
-
+			if _, err := tarWriter.Write(data); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
+
+	return nil
 }
 
 func extractTarball() {
@@ -199,7 +213,10 @@ func main() {
 
 	flag.Parse()
 	if flag.Arg(0) == "tar" {
-		createTarball()
+		if err := createTarball(); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 	}
 	if flag.Arg(0) == "untar" {
 		extractTarball()
@@ -211,3 +228,5 @@ func main() {
 // @TODO specify extraction directory: tarball.tar.gz needs to be extracted in tarball directory :: DONE
 // now the tarball is being extracted in the directory the bin file is being ran from
 // @TODO add absolute path to the creating directories :: DONE
+
+// @TODO add a way for user to exclude the files they dont want to tar
