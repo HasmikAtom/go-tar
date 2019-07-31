@@ -185,23 +185,25 @@ func extractTarball() {
 			// handle directory
 			fmt.Println("Creating directory :", filename)
 
-			err = os.MkdirAll(filename, os.FileMode(header.Mode)) // or use 0755
-			checkError(err)
+			if _, err := os.Stat(filename); err != nil {
+				err = os.MkdirAll(filename, 0755) // or use 0755
+				checkError(err)
+			}
 
 		case tar.TypeReg:
 			// handle normal file
 			fmt.Println("Untarring :", filename)
-			writer, err := os.Create(filename)
+			newFile, err := os.Create(filename)
 
 			checkError(err)
 
-			io.Copy(writer, tarBallReader)
+			_, err = io.Copy(newFile, tarBallReader)
+			checkError(err)
 
 			err = os.Chmod(filename, os.FileMode(header.Mode))
-
 			checkError(err)
 
-			writer.Close()
+			newFile.Close()
 		default:
 			fmt.Printf("Unable to untar type : %c in file %s", header.Typeflag, filename)
 		}
