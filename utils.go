@@ -179,7 +179,7 @@ func extractTarball() {
 			// handle directory
 			fmt.Println("Creating directory :", filename)
 			if _, err := os.Stat(filename); err != nil {
-				err = os.MkdirAll(filename, 0755) // or use 0755
+				err = os.MkdirAll(filename, os.FileMode(header.Mode)) // or use 0755
 				checkError(err)
 			}
 		case tar.TypeReg:
