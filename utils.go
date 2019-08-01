@@ -21,27 +21,28 @@ func checkError(err error) {
 }
 
 func createTarball() error {
-	// parsing the flags
 	flag.Parse()
-	sourcedir := flag.Arg(1)
 
+	sourcedir := flag.Arg(1)
 	if sourcedir == "" {
 		fmt.Println("Please specify the source\nUsage: go-tarball source destinationfile.tar.gz")
-		os.Exit(1)
-	}
-
-	destinationfile := flag.Arg(2)
-
-	if destinationfile == "" {
-		fmt.Println("Please specify the destination\nUsage: go-tarball source destinationfile.tar.gz")
 		os.Exit(1)
 	}
 
 	absSourcePath, err := filepath.Abs(sourcedir) // getting absolute path to the directory to tar
 	checkError(err)
 
-	absDestinationPath, err := filepath.Abs(destinationfile) // getting absolute path to the destination file
-	checkError(err)
+	var absDestinationPath string
+
+	destinationfile := flag.Arg(2)
+	if destinationfile == "" {
+		// take filename as destination name if no second flag
+		absDestinationPath = absSourcePath + ".tar.gz"
+	} else {
+		destinationdir, err := filepath.Abs(destinationfile) // getting absolute path to the destination file
+		absDestinationPath = destinationdir
+		checkError(err)
+	}
 
 	// creating destination directory
 	destinationDir, err := os.Create(absDestinationPath) // created file
@@ -50,14 +51,10 @@ func createTarball() error {
 	}
 
 	var fileWriter io.WriteCloser = destinationDir
-
-	// compressing if second flag contains "gz"
-	if strings.HasSuffix(destinationfile, ".gz") {
-		fileWriter = gzip.NewWriter(destinationDir) // add gzip filter
-		defer fileWriter.Close()
-	}
-
+	fileWriter = gzip.NewWriter(destinationDir) // add gzip filter
+	defer fileWriter.Close()
 	tarWriter := tar.NewWriter(fileWriter)
+
 	// going over the files
 	err = filepath.Walk(absSourcePath, func(file string, fi os.FileInfo, err error) error {
 		// for each file
@@ -81,12 +78,12 @@ func createTarball() error {
 			return err
 		}
 		if !fi.IsDir() {
-			// read file if its a directory
+			// read file if its not a directory
+			fmt.Println("Taring:", file)
 			data, err := ioutil.ReadFile(file)
 			if err != nil {
 				return err
 			}
-
 			if _, err := tarWriter.Write(data); err != nil {
 				return err
 			}
@@ -101,11 +98,9 @@ func createTarball() error {
 }
 
 func extractTarball() {
-
 	flag.Parse() // get the arguments from command line
 
 	sourcefile := flag.Arg(1)
-
 	if sourcefile == "" {
 		fmt.Println("Usage : go-untar sourcefile.tar")
 		os.Exit(1)
@@ -135,7 +130,6 @@ func extractTarball() {
 		extension = filepath.Ext(filename)
 		destinationdir := filename[0 : len(filename)-len(extension)]
 		absDestinationPath = destinationdir
-
 	} else {
 		destEmpty = false
 		destinationdir, err := filepath.Abs(destinationdir)
@@ -154,7 +148,6 @@ func extractTarball() {
 			extension = filepath.Ext(absDestinationPath)
 			absDestinationPath = absDestinationPath[0 : len(absDestinationPath)-len(extension)]
 		}
-
 		defer fileReader.Close()
 	}
 
@@ -180,21 +173,19 @@ func extractTarball() {
 
 		// get the individual filename and extract to the current directory
 		filename := filepath.Join(absDestinationPath, header.Name) // add absolute path
+
 		switch header.Typeflag {
 		case tar.TypeDir:
 			// handle directory
 			fmt.Println("Creating directory :", filename)
-
 			if _, err := os.Stat(filename); err != nil {
 				err = os.MkdirAll(filename, 0755) // or use 0755
 				checkError(err)
 			}
-
 		case tar.TypeReg:
 			// handle normal file
 			fmt.Println("Untarring :", filename)
 			newFile, err := os.Create(filename)
-
 			checkError(err)
 
 			_, err = io.Copy(newFile, tarBallReader)
